@@ -6,6 +6,8 @@ from optimism.core.fact_event_logs
 where block_timestamp > '2022-12-14'
 and contract_address = '0xee36eaad94d1cc1d0eccadb55c38bffb6be06c77' 
 and topics[0]::string = '0x28710dfecab43d1e29e02aa56b2e1e610c0bae19135c9cf7a83a1adb6df96d85'
+order by block_timestamp
+limit 5000
 )
 , decoded AS (
 select 
@@ -32,13 +34,13 @@ user_ens as
   ens_name as name
   from 
   crosschain.core.ez_ens
-  where owner in (select distinct origin_from_address from decoded)
+  where owner in (select distinct about from decoded)
   and ens_set = 'Y'
 ),
 links as 
 (
     SELECT 
-    coalesce(user_ens.name,concat(left(origin_from_address,4),'..',right(origin_from_address,4))) as source,
+    coalesce(user_ens.name,concat(left(about,4),'..',right(about,4))) as source,
     case 
         when decoded_key like '%Twitter%'
         then 'Twitter'
@@ -50,12 +52,12 @@ links as
     end as target,
     block_timestamp
     FROM decoded
-    left join user_ens on decoded.origin_from_address = user_ens.owner
+    left join user_ens on decoded.about = user_ens.owner
 )
 select 
 source,
 target
 from
 links
-QUALIFY RANK() OVER (PARTITION BY concat(source,'-',target) ORDER BY block_timestamp) = 1
+QUALIFY ROW_NUMBER() OVER (PARTITION BY source, target ORDER BY source, target) = 1
 """
